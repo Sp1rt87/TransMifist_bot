@@ -3,64 +3,70 @@ import logging
 from io import BytesIO
 import os
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from openai import AsyncOpenAI
 from pydub import AudioSegment
+AudioSegment.converter = r"C:\Users\Администратор\Desktop\whisper-telegram-bot\ffmpeg-2026-05-13-git-a327bc0561-full_build\bin\ffmpeg.exe"
 
+# Настройка логирования, чтобы видеть ошибки в консоли
 logging.basicConfig(level=logging.INFO)
 
-# === Настройки из переменных окружения ===
-bot = Bot(token=os.getenv("8944857956:AAEZXi21nWWej8QuXIpEnXpEuXfibROFA9k"))
+# === ТВОИ ДАННЫЕ (БЕЗ ЛИШНИХ ПРОБЕЛОВ И ОБЕРТОК) ===
+BOT_TOKEN = "8944857956:AAEZXi21nWWej8QuXIpEnXpEuXfibROFA9k"
+OPENAI_KEY = "AQ6TAHdct4Bp_fCzFwxmfPRDM12W_RJAoWFqv0jrFC3wqvXGjM59lQ55NyUv8aLhLLo5R-dHnaT3BlbkFJMfcjWMWLX8dhAtW6m_wems-fwd4KKdn4p0XuY5Jsy56DNBM-XQnh3W2jMfwleLZ4Y867QrUoMA"
+
+# Инициализация бота и клиента OpenAI
+bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-client = AsyncOpenAI(api_key=os.getenv("AQ6TAHdct4Bp_fCzFwxmfPRDM12W_RJAoWFqv0jrFC3wqvXGjM59lQ55NyUv8aLhLLo5R-dHnaT3BlbkFJMfcjWMWLX8dhAtW6m_wems-fwd4KKdn4p0XuY5Jsy56DNBM-XQnh3W2jMfwleLZ4Y867QrUoMA"))
-# =========================================
+client = AsyncOpenAI(api_key=OPENAI_KEY)
 
 
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
-    await message.answer("👋 Кидай голосовые или аудио — переведу на русский!")
+    await message.answer("👋 Привет! Пришли мне голосовое сообщение или аудиофайл (WAV, MP3), и я переведу его на русский язык.")
 
 
-@dp.message(lambda m: m.voice or m.audio)
+@dp.message(F.voice | F.audio)
 async def handle_audio(message: types.Message):
-    await message.answer("🎙️ Обрабатываю...")
+    status_msg = await message.answer("🎙️ Обрабатываю аудио, подождите...")
 
     try:
-        # Получаем файл
+        # 1. Получаем ID файла (голос или аудио)
         file_id = message.voice.file_id if message.voice else message.audio.file_id
         file = await bot.get_file(file_id)
+
+        # 2. Скачиваем файл в память
         file_bytes = await bot.download_file(file.file_path)
 
-        # Конвертируем в mp3
+        # 3. Конвертируем в mp3 через pydub
         audio = AudioSegment.from_file(BytesIO(file_bytes.getvalue()))
         mp3_io = BytesIO()
         audio.export(mp3_io, format="mp3")
         mp3_io.seek(0)
+        mp3_io.name = "audio.mp3"  # Важное имя для API
 
-        # Транскрипция и перевод
-        transcription = await client.audio.transcriptions.create(
+        # 4. Отправляем в OpenAI Whisper на расшифровку и перевод
+        response = await client.audio.transcriptions.create(
             model="whisper-1",
-            file=("audio.mp3", mp3_io, "audio/mpeg")
+            file=mp3_io,
+            prompt="Translate this audio to Russian language, please."
         )
 
-        translation = await client.audio.translations.create(
-            model="whisper-1",
-            file=("audio.mp3", mp3_io, "audio/mpeg")
-        )
-
-        result = f"""🎤 **Оригинал:**\n{transcription.text}\n\n🇷🇺 **Перевод на русский:**\n{translation.text}"""
-
-        await message.answer(result, parse_mode="Markdown")
+        # 5. Отправляем результат пользователю
+        await status_msg.edit_text(f"📝 **Перевод:**\n\n{response.text}")
 
     except Exception as e:
-        logging.error(e)
-        await message.answer("❌ Ошибка при обработке аудио. Попробуй ещё раз.")
+        logging.error(f"Ошибка: {e}")
+        await status_msg.edit_text("❌ Произошла ошибка. Проверь API-ключ или работу FFmpeg на сервере.")
 
 
 async def main():
+    logging.info("Бот запущен и готов к работе...")
     await dp.start_polling(bot)
 
-
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except (KeyboardInterrupt, SystemExit):
+        logging.info("Бот остановлен")
