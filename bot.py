@@ -11,7 +11,7 @@ from pydub import AudioSegment
 logging.basicConfig(level=logging.INFO)
 
 # === Настройки из переменных окружения ===
-bot = Bot(token=os.getenv(8944857956: AAEZXi21nWWej8QuXIpEnXpEuXfibROFA9k))
+bot = Bot(token=os.getenv("8944857956: AAEZXi21nWWej8QuXIpEnXpEuXfibROFA9k"))
 dp = Dispatcher()
 client = AsyncOpenAI(api_key=os.getenv(AQ6TAHdct4Bp_fCzFwxmfPRDM12W_RJAoWFqv0jrFC3wqvXGjM59lQ55NyUv8aLhLLo5R -
                      dHnaT3BlbkFJMfcjWMWLX8dhAtW6m_wems-fwd4KKdn4p0XuY5Jsy56DNBM-XQnh3W2jMfwleLZ4Y867QrUoMA))
