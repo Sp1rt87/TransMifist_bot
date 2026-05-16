@@ -7,7 +7,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from openai import AsyncOpenAI
 from pydub import AudioSegment
-AudioSegment.converter = r"C:\Users\Администратор\Desktop\whisper-telegram-bot\ffmpeg-2026-05-13-git-a327bc0561-full_build\bin\ffmpeg.exe"
+AudioSegment.converter = r"D:\whisper-telegram-bot\bin\ffmpeg.exe"
 
 # Настройка логирования, чтобы видеть ошибки в консоли
 logging.basicConfig(level=logging.INFO)
@@ -49,7 +49,7 @@ async def handle_audio(message: types.Message):
         # 4. Отправляем в OpenAI Whisper на расшифровку и перевод
         response = await client.audio.transcriptions.create(
             model="whisper-1",
-            file=mp3_io,
+            file=("audio.mp3", mp3_io, "audio/mpeg"),
             prompt="Translate this audio to Russian language, please."
         )
 
