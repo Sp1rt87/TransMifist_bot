@@ -27,16 +27,24 @@ async def cmd_start(message: types.Message):
     await message.answer("👋 Привет! Пришли мне голосовое сообщение или аудиофайл (WAV, MP3), и я переведу его на русский язык.")
 
 
-@dp.message(F.voice | F.audio)
+@dp.message(F.voice | F.audio | F.document)
 async def handle_audio(message: types.Message):
     status_msg = await message.answer("🎙️ Обрабатываю аудио, подождите...")
 
     try:
-        # 1. Получаем ID файла (голос или аудио)
-        file_id = message.voice.file_id if message.voice else message.audio.file_id
-        file = await bot.get_file(file_id)
+        # 1. Определяем, откуда брать file_id (голос, аудио или документ)
+        if message.voice:
+            file_id = message.voice.file_id
+        elif message.audio:
+            file_id = message.audio.file_id
+        elif message.document and (message.document.file_name.endswith('.wav') or message.document.file_name.endswith('.mp3')):
+            file_id = message.document.file_id
+        else:
+            await status_msg.edit_text("❌ Пожалуйста, отправь именно аудиофайл (wav, mp3) или голосовое сообщение.")
+            return
 
-        # 2. Скачиваем файл в память
+        # 2. Скачиваем файл в оперативную память
+        file = await bot.get_file(file_id)
         file_bytes = await bot.download_file(file.file_path)
 
         # 3. Конвертируем в mp3 через pydub
@@ -44,9 +52,8 @@ async def handle_audio(message: types.Message):
         mp3_io = BytesIO()
         audio.export(mp3_io, format="mp3")
         mp3_io.seek(0)
-        mp3_io.name = "audio.mp3"  # Важное имя для API
 
-        # 4. Отправляем в OpenAI Whisper на расшифровку и перевод
+        # 4. Отправляем в OpenAI Whisper
         response = await client.audio.transcriptions.create(
             model="whisper-1",
             file=("audio.mp3", mp3_io, "audio/mpeg"),
@@ -54,11 +61,14 @@ async def handle_audio(message: types.Message):
         )
 
         # 5. Отправляем результат пользователю
-        await status_msg.edit_text(f"📝 **Перевод:**\n\n{response.text}")
+        if response.text.strip():
+            await status_msg.edit_text(f"📝 **Перевод:**\n\n{response.text}")
+        else:
+            await status_msg.edit_text("🤷‍♂️ В аудиозаписи не удалось распознать речь.")
 
     except Exception as e:
         logging.error(f"Ошибка: {e}")
-        await status_msg.edit_text("❌ Произошла ошибка. Проверь API-ключ или работу FFmpeg на сервере.")
+        await status_msg.edit_text("❌ Произошла ошибка. Проверь баланс OpenAI ключа или формат аудио.")
 
 
 async def main():
