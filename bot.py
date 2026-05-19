@@ -62,7 +62,14 @@ async def handle_audio(message: types.Message):
 
         # 5. Отправляем результат пользователю
         if response.text.strip():
-            await status_msg.edit_text(f"📝 **Перевод:**\n\n{response.text}")
+            # Отрезаем расширение файла (.wav/.mp3) для красоты, если оно есть
+            display_name = os.path.splitext(source_filename)[0]
+
+            await status_msg.edit_text(
+                f"📋 **Файл:** `{display_name}`\n"
+                f"📝 **Перевод:**\n\n"
+                f"{response.text}"
+            )
         else:
             await status_msg.edit_text("🤷‍♂️ В аудиозаписи не удалось распознать речь.")
 
